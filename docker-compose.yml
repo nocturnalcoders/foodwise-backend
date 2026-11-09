@@ -1,0 +1,43 @@
+# FOODWISE: API + PostgreSQL
+# Start:   docker compose up -d --build
+# Logs:    docker compose logs -f api
+# Stop:    docker compose down        (data is kept in the "pgdata" volume)
+name: foodwise
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: foodwise
+      POSTGRES_USER: foodwise
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodwise -d foodwise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Only reachable from inside the droplet (for an SSH tunnel), never from the internet
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://foodwise:${POSTGRES_PASSWORD}@db:5432/foodwise
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://foodwise-murex.vercel.app,http://localhost:5173}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-5-5}
+    # Nginx on the droplet forwards https://your-domain to this port
+    ports:
+      - "127.0.0.1:${API_PORT:-8001}:8000"
+
+volumes:
+  pgdata:
