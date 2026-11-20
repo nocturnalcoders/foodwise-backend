@@ -10,12 +10,26 @@ from datetime import date, datetime, timezone
 from typing import Literal, Optional
 
 from pydantic import field_validator
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
 
 
 def new_id() -> str:
     return uuid.uuid4().hex
+
+
+MAX_IMAGE_CHARS = 400_000  # about 300 KB; the app shrinks photos before sending
+
+
+def check_image(v: Optional[str]) -> Optional[str]:
+    """Photos are stored as small JPEG data URLs (or an https link from Google)."""
+    if not v:
+        return None
+    if not (v.startswith("data:image/") or v.startswith("https://")):
+        raise ValueError("must be an image")
+    if len(v) > MAX_IMAGE_CHARS:
+        raise ValueError("image is too large, use one under 300 KB")
+    return v
 
 
 # ---------- accounts ----------
@@ -32,7 +46,10 @@ class User(SQLModel, table=True):
     id: str = Field(default_factory=new_id, primary_key=True)
     name: str = Field(max_length=60)
     email: str = Field(index=True, unique=True, max_length=200)
-    password_hash: str
+    password_hash: str = ""  # empty for accounts made with Google or Apple
+    avatar: Optional[str] = Field(default=None, sa_column=Column(Text))
+    google_sub: Optional[str] = Field(default=None, index=True, unique=True, max_length=100)
+    apple_sub: Optional[str] = Field(default=None, index=True, unique=True, max_length=100)
     household_id: Optional[str] = Field(default=None, foreign_key="households.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -47,6 +64,18 @@ class ItemIn(SQLModel):
     pct: int = Field(default=100, ge=0, le=100)
     em: str = Field(default="🍽️", max_length=8)
     added: date = Field(default_factory=date.today)
+    photo: Optional[str] = Field(default=None, sa_column=Column(Text))
+    note: Optional[str] = Field(default=None, max_length=300)
+
+    @field_validator("note")
+    @classmethod
+    def blank_note(cls, v: Optional[str]) -> Optional[str]:
+        return (v or "").strip() or None
+
+    @field_validator("photo")
+    @classmethod
+    def small_image(cls, v: Optional[str]) -> Optional[str]:
+        return check_image(v)
 
 
 class Item(ItemIn, table=True):

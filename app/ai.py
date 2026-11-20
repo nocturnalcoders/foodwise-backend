@@ -24,14 +24,16 @@ def today_sg() -> str:
     return datetime.now(ZoneInfo("Asia/Singapore")).date().isoformat()
 
 
-def ask_claude(content: list, max_tokens: int = 800) -> dict:
+def ask_claude(content: list, max_tokens: int = 2000) -> dict:
     if not ANTHROPIC_API_KEY:
         raise HTTPException(503, "AI features are not set up yet.")
     try:
         r = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": CLAUDE_MODEL, "max_tokens": max_tokens, "messages": [{"role": "user", "content": content}]},
+            # Low effort keeps replies fast and cheap; max_tokens leaves room for the model's thinking before the JSON
+            json={"model": CLAUDE_MODEL, "max_tokens": max_tokens, "output_config": {"effort": "low"},
+                  "messages": [{"role": "user", "content": content}]},
             timeout=60,
         )
     except httpx.HTTPError:
@@ -76,7 +78,7 @@ Reply with only JSON, no other text:
  "shelf_life_days": typical number of days until it should be used, if no date is readable,
  "quantity": number,
  "unit": "pcs" | "pack" | "L" | "ml" | "kg" | "g"}}"""},
-    ], max_tokens=300)
+    ])
 
     exp = r.get("expiry_date")
     exp = exp if isinstance(exp, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", exp) else None
@@ -109,7 +111,7 @@ Suggest ONE simple home recipe (40 minutes or less) that uses as many of the soo
 Reply with only JSON, no other text:
 {{"name": "...", "emoji": "one food emoji", "minutes": 25,
  "ingredients": ["short lowercase ingredient names such as chicken, lettuce"],
- "steps": ["4 to 6 short steps"]}}"""}], max_tokens=900)
+ "steps": ["4 to 6 short steps"]}}"""}])
 
     if not r.get("name") or not isinstance(r.get("ingredients"), list):
         raise HTTPException(502, "The AI reply could not be read. Try again.")

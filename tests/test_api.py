@@ -11,7 +11,7 @@ from app.main import app  # noqa: E402
 
 
 def login(c, name, email, pw="secret123"):
-    r = c.post("/api/auth/login", json={"name": name, "email": email, "password": pw})
+    r = c.post("/api/auth/register", json={"name": name, "email": email, "password": pw})
     assert r.status_code == 200, r.text
     return {"Authorization": "Bearer " + r.json()["token"]}
 
@@ -26,7 +26,7 @@ def test_full_flow():
         # login again with wrong password
         assert c.post("/api/auth/login", json={"email": "loki@jcu.edu.sg", "password": "nope"}).status_code == 401
         # short password on sign up
-        assert c.post("/api/auth/login", json={"email": "new@x.com", "password": "123"}).status_code == 400
+        assert c.post("/api/auth/register", json={"email": "new@x.com", "password": "123"}).status_code == 422
         # no token
         assert c.get("/api/items").status_code == 401
 
@@ -38,6 +38,11 @@ def test_full_flow():
         assert c.put("/api/meals/m1", json={"id": "m1", "date": "2026-11-10", "rid": "r1"}, headers=loki).status_code == 200
         assert c.put("/api/saved/v1", json={"id": "v1", "name": "Spinach", "kg": 0.3, "date": "2026-11-07"}, headers=loki).status_code == 200
         assert c.put("/api/items/bad", json={**item, "pct": 500}, headers=loki).status_code == 422
+        # optional note
+        assert c.put("/api/items/n1", json={**item, "id": "n1", "note": "  Opened Monday "}, headers=loki).json()["note"] == "Opened Monday"
+        assert c.put("/api/items/n1", json={**item, "id": "n1", "note": "   "}, headers=loki).json()["note"] is None
+        assert c.put("/api/items/n2", json={**item, "id": "n2", "note": "x" * 301}, headers=loki).status_code == 422
+        c.delete("/api/items/n1", headers=loki)
         assert c.get("/api/nothing", headers=loki).status_code == 404
 
         # Eve cannot see or touch Loki's data

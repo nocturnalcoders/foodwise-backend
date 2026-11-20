@@ -102,6 +102,38 @@ Photo scan and AI recipes call the Claude API. Create a key at https://console.a
 Without a key the rest of the app works normally; the AI buttons show
 "AI features are not set up yet."
 
+## 6. Google and Apple sign-in (optional)
+
+The buttons are always shown. They start working as soon as the server has the matching variable;
+the app reads it from `GET /api/auth/config`, so nothing changes in the frontend.
+
+### Google (free)
+
+1. Go to https://console.cloud.google.com, create a project (or pick one).
+2. **APIs & Services > OAuth consent screen**: choose **External**, fill in the app name (FOODWISE),
+   support email and developer email. Add the scopes `email`, `profile`, `openid`.
+   While the app is in "Testing", add your own Google accounts under **Test users**.
+3. **APIs & Services > Credentials > Create credentials > OAuth client ID**, type **Web application**.
+4. Under **Authorized JavaScript origins** add every address the app runs on, for example
+   `http://localhost:5173` and `https://foodwise-murex.vercel.app`. No redirect URI is needed.
+5. Copy the **Client ID** (ends in `.apps.googleusercontent.com`) and set it on the server:
+   `GOOGLE_CLIENT_ID=1234-abc.apps.googleusercontent.com`. Restart the API.
+
+### Apple (needs a paid Apple Developer account, $99/year)
+
+1. At https://developer.apple.com/account, **Certificates, IDs & Profiles > Identifiers**:
+   make an **App ID** with "Sign in with Apple" turned on.
+2. Make a **Services ID** (for example `com.foodwise.web`), turn on "Sign in with Apple",
+   click **Configure**, pick the App ID, and add:
+   - **Domains**: `foodwise-murex.vercel.app` (Apple does not accept `localhost`)
+   - **Return URLs**: `https://foodwise-murex.vercel.app`
+3. Set `APPLE_CLIENT_ID=com.foodwise.web` (the Services ID) on the server and restart the API.
+
+Apple sign-in only works on the HTTPS domain you registered, so test it on the deployed site.
+
+Existing databases get the new columns (`avatar`, `google_sub`, `apple_sub`, item `photo`)
+automatically when the API starts.
+
 ## Good to know
 
 - **Free Render services sleep after 15 minutes without visits**, and the first request

@@ -23,3 +23,7 @@ ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
 ).split(",") if o.strip()]
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-5-5").strip()
+
+# Optional: social sign-in. Leave empty to hide that button in the app.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()  # Web client ID from Google Cloud Console
+APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID", "").strip()  # Apple "Services ID", e.g. com.foodwise.web

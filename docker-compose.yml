@@ -35,6 +35,8 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://foodwise-murex.vercel.app,http://localhost:5173}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-5-5}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
     # Nginx on the droplet forwards https://your-domain to this port
     ports:
       - "127.0.0.1:${API_PORT:-8001}:8000"

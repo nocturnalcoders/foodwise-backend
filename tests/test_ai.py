@@ -22,7 +22,7 @@ class FakeReply:
 def test_ai(monkeypatch):
     monkeypatch.setattr(ai, "ANTHROPIC_API_KEY", "test")
     with TestClient(app) as c:
-        tok = c.post("/api/auth/login", json={"name": "A", "email": "a@x.com", "password": "secret123"}).json()["token"]
+        tok = c.post("/api/auth/register", json={"name": "A", "email": "a@x.com", "password": "secret123"}).json()["token"]
         h = {"Authorization": "Bearer " + tok}
 
         monkeypatch.setattr(httpx, "post", lambda *a, **k: FakeReply('Here: {"name":"Milk<script>","category":"fridge","expiry_date":null,"shelf_life_days":"5","quantity":1,"unit":"L"}'))
