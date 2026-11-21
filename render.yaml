@@ -22,6 +22,8 @@ services:
         sync: false
       - key: CLAUDE_MODEL
         value: claude-haiku-5-5
+      - key: GEMINI_API_KEY
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: APPLE_CLIENT_ID

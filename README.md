@@ -95,10 +95,16 @@ You don't need to create tables; the API creates them on first start.
 Open https://foodwise-murex.vercel.app: the login screen now asks for a password,
 and data is saved in the database.
 
-## 5. AI features (optional, paid per use)
+## 5. AI features (optional)
 
-Photo scan and AI recipes call the Claude API. Create a key at https://console.anthropic.com
-(add credit to your account), then set `ANTHROPIC_API_KEY` on Render.
+Photo scan and AI recipes call either Gemini or the Claude API. Set one key on the server:
+
+- **Gemini (free tier):** create a key at https://aistudio.google.com (**Get API key**) and set
+  `GEMINI_API_KEY`. The default model is `gemini-3.5-flash-lite`; change it with `GEMINI_MODEL`.
+- **Claude (paid per use):** create a key at https://console.anthropic.com (add credit to your account)
+  and set `ANTHROPIC_API_KEY`.
+
+If both are set, Gemini is used.
 Without a key the rest of the app works normally; the AI buttons show
 "AI features are not set up yet."
 

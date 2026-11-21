@@ -1,4 +1,4 @@
-"""Calls the Claude API for photo scan and recipe ideas. The API key stays on the server."""
+"""Calls Gemini or the Claude API for photo scan and recipe ideas. The API key stays on the server."""
 import base64
 import io
 import json
@@ -10,7 +10,7 @@ import httpx
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
 
-from .config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from .config import ANTHROPIC_API_KEY, CLAUDE_MODEL, GEMINI_API_KEY, GEMINI_MODEL
 
 UNITS = {"pcs", "pack", "L", "ml", "kg", "g"}
 CATS = {"fridge", "freezer", "pantry"}
@@ -24,9 +24,49 @@ def today_sg() -> str:
     return datetime.now(ZoneInfo("Asia/Singapore")).date().isoformat()
 
 
+def ask_ai(content: list) -> dict:
+    """content uses Claude's block format; Gemini is used when GEMINI_API_KEY is set."""
+    if GEMINI_API_KEY:
+        return ask_gemini(content)
+    if ANTHROPIC_API_KEY:
+        return ask_claude(content)
+    raise HTTPException(503, "AI features are not set up yet.")
+
+
+def read_json(text: str) -> dict:
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        return json.loads(text[start:end + 1])
+    except (ValueError, json.JSONDecodeError):
+        print("Unreadable AI reply:", text[:500])
+        raise HTTPException(502, "The AI reply could not be read. Try again.")
+
+
+def ask_gemini(content: list, max_tokens: int = 2000) -> dict:
+    parts = [{"type": "text", "text": b["text"]} if b["type"] == "text" else
+             {"type": "image", "data": b["source"]["data"], "mime_type": b["source"]["media_type"]}
+             for b in content]
+    try:
+        r = httpx.post(
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            headers={"x-goog-api-key": GEMINI_API_KEY, "content-type": "application/json"},
+            json={"model": GEMINI_MODEL, "store": False, "input": parts,
+                  "generation_config": {"max_output_tokens": max_tokens}},
+            timeout=60,
+        )
+    except httpx.HTTPError:
+        raise HTTPException(502, "The AI service is unavailable. Try again later.")
+    if r.status_code in (429, 503):
+        raise HTTPException(503, "The AI is busy right now. Try again in a minute.")
+    if r.status_code != 200:
+        print("Gemini API error", r.status_code, r.text[:500])
+        raise HTTPException(502, "The AI service is unavailable. Try again later.")
+    text = "".join(c.get("text", "") for s in r.json().get("steps", []) if s.get("type") == "model_output"
+                   for c in s.get("content", []) if c.get("type") == "text")
+    return read_json(text)
+
+
 def ask_claude(content: list, max_tokens: int = 2000) -> dict:
-    if not ANTHROPIC_API_KEY:
-        raise HTTPException(503, "AI features are not set up yet.")
     try:
         r = httpx.post(
             "https://api.anthropic.com/v1/messages",
@@ -44,12 +84,7 @@ def ask_claude(content: list, max_tokens: int = 2000) -> dict:
         print("Claude API error", r.status_code, r.text[:500])
         raise HTTPException(502, "The AI service is unavailable. Try again later.")
     text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-    start, end = text.find("{"), text.rfind("}")
-    try:
-        return json.loads(text[start:end + 1])
-    except (ValueError, json.JSONDecodeError):
-        print("Unreadable AI reply:", text[:500])
-        raise HTTPException(502, "The AI reply could not be read. Try again.")
+    return read_json(text)
 
 
 def shrink_photo(raw: bytes) -> str:
@@ -67,7 +102,7 @@ def shrink_photo(raw: bytes) -> str:
 
 def scan_photo(raw: bytes) -> dict:
     image = shrink_photo(raw)
-    r = ask_claude([
+    r = ask_ai([
         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image}},
         {"type": "text", "text": f"""This photo comes from a household food inventory app in Singapore. Today is {today_sg()}.
 Identify the main food item. The photo may show the food itself, its packaging, a label or a barcode.
@@ -104,7 +139,7 @@ def suggest_recipe(items: list[dict]) -> dict:
         f"- {clean(i.get('name'), 40)} ({int(i.get('pct') or 0)}% left, {int(i.get('days_left') or 0)} days to expiry)"
         for i in items[:60]
     )
-    r = ask_claude([{"type": "text", "text": f"""You help a Singapore household reduce food waste. Their food at home, soonest expiry first:
+    r = ask_ai([{"type": "text", "text": f"""You help a Singapore household reduce food waste. Their food at home, soonest expiry first:
 {lines}
 
 Suggest ONE simple home recipe (40 minutes or less) that uses as many of the soonest-expiring items as possible, plus common staples.
